@@ -4,7 +4,8 @@ Video stabilization using Harris Corner Detection.
 ## Overview
 <img src='https://github.com/johun204/Video-stabilization/raw/main/media/image1.gif'>
 
- * After detecting a corner using Harris Corner Detection in the previous frame and the current frame, Move the Stabilization Rectangle by comparing the similarity using Histogram of Oriented Gradient (HOG).
+ * After detecting corners using Harris Corner Detection in the previous frame and current frame,
+ Move the Stabilization Rectangle by comparing similarity using Histogram of Oriented Gradient (HOG).
 
  * Improved Histogram of Oriented Gradient(HOG) calculation speed using Integral Image.
 
