@@ -4,17 +4,18 @@
 
 #define STABILIZATION_MARGIN 50
 
-#define VECTOR_ADD(X,Y) sqrtf(((X)*(X)) + ((Y)*(Y))) // º¤ÅÍ ÇÕ ¿¬»ê
-#define DEG(RAD) (((RAD) + ((RAD) < 0 ? PI : 0)) / PI * 180) // Rad to Deg ÇÔ¼ö 
+#define VECTOR_ADD(X,Y) sqrtf(((X)*(X)) + ((Y)*(Y))) // ë²¡í„° í•© ì—°ì‚°
+#define DEG(RAD) (((RAD) + ((RAD) < 0 ? PI : 0)) / PI * 180) // Rad to Deg í•¨ìˆ˜ 
 #define K 0.04
 #define THRESHOLD 0.01
-#define HISTOGRAMSIZE 16 // ÄÚ³Ê ÁÂÇ¥ ÁÖº¯À¸·Î Histogram ÇÒ »çÀÌÁî
+#define HISTOGRAMSIZE 16 // Corner ì¢Œí‘œ ì£¼ë³€ìœ¼ë¡œ Histogram í•  ì‚¬ì´ì¦ˆ
 #define HISTOGRAMINTV 8
-#define WINDOWSIZE 5 // R °è»êÀ» À§ÇÑ windowÀÇ Å©±â
+#define WINDOWSIZE 5 // R ê³„ì‚°ì„ ìœ„í•œ windowì˜ í¬ê¸°
 #define PI 3.141593
 
 using namespace cv;
 
+// Histogram of Oriented Gradient êµ¬ì¡°ì²´ ë°  ì„ ì–¸
 typedef struct _HOG {
 	float d[9] = { 0 };
 } HOG;
@@ -30,13 +31,13 @@ HOG plusHOG(HOG a, HOG b) {
 	return result;
 }
 
-void GaussianFilter(Mat &Img, Mat &OutputImg, int filterSize, float sigma) { // °¡¿ì½Ã¾È ÇÊÅÍ ÇÔ¼ö
-	float *Filter = (float*)malloc(sizeof(float) * filterSize * filterSize); // ÇÊÅÍ »ı¼º
+
+// ê°€ìš°ì‹œì•ˆ í•„í„° í•¨ìˆ˜
+void GaussianFilter(Mat &Img, Mat &OutputImg, int filterSize, float sigma) {
+	float *Filter = (float*)malloc(sizeof(float) * filterSize * filterSize);
 	int halfSize = filterSize / 2;
 	int inputWidth = Img.cols;
 	int inputHeight = Img.rows;
-
-	
 
 	for (int i = 0; i <= halfSize; i++)
 		for (int j = 0; j <= halfSize; j++)
@@ -45,24 +46,30 @@ void GaussianFilter(Mat &Img, Mat &OutputImg, int filterSize, float sigma) { // 
 	for (int i = 0; i < inputHeight; i++) {
 		for (int j = 0; j < inputWidth; j++) {
 			float sum = 0, FilterSum = 0;
-			// ÇÊÅÍ Å©±â¸¸Å­ ¹İº¹¹® ¼öÇà 
+
+			// í•„í„° í¬ê¸°ë§Œí¼ ë°˜ë³µë¬¸ ìˆ˜í–‰ 
 			for (int x = 0; x < filterSize; x++) {
 				if (i + x - halfSize < 0 || i + x - halfSize >= inputHeight)
 					continue;
 				for (int y = 0; y < filterSize; y++) {
 					if (j + y - halfSize < 0 || j + y - halfSize >= inputWidth)
 						continue;
-					// °¡¿ì½Ã¾È ÇÊÅÍ ¿¬»ê½Ã ÇÊÅÍ°ªÀÇ ÇÕÀ¸·Î ³ª´©±â ¶§¹®¿¡ ÇÊÅÍ°ªÀÇ ÇÕ ¿¬»ê
+
+					// ê°€ìš°ì‹œì•ˆ í•„í„° ì—°ì‚°ì‹œ í•„í„°ê°’ì˜ í•©ìœ¼ë¡œ ë‚˜ëˆ„ê¸° ë•Œë¬¸ì— í•„í„°ê°’ì˜ í•© ì—°ì‚°
 					FilterSum += Filter[x * filterSize + y];
-					// ÇÊÅÍ¿Í ÀÌ¹ÌÁö¸¦ ¿¬»êÇÏ¿© sum ÇÕ ¿¬»ê
+
+					// í•„í„°ì™€ ì´ë¯¸ì§€ë¥¼ ì—°ì‚°í•˜ì—¬ sum í•© ì—°ì‚°
 					sum += Filter[x * filterSize + y] * Img.at<uchar>(i + x - halfSize, j + y - halfSize);
 				}
-			}// ÇÊÅÍÀÇ ¿¬»ê°ªÀÇ ÇÕÀ» ÇÊÅÍ°ªÀÇ ÇÕÀ¸·Î ³ª´©¾îÁÜ
+			}
+			// í•„í„°ì˜ ì—°ì‚°ê°’ì˜ í•©ì„ í•„í„°ê°’ì˜ í•©ìœ¼ë¡œ ë‚˜ëˆ„ì–´ì¤Œ
 			OutputImg.at<uchar>(i, j) = sum / FilterSum;
 		}
 	}
 	free(Filter);
 }
+
+// Harris Corner Detection í•¨ìˆ˜
 int HarrisCornerDetect(Mat &Image, HOG *Hg, Point2d *POS) {
 	Mat Img;
 	cvtColor(Image, Img, CV_RGB2GRAY);
@@ -72,42 +79,59 @@ int HarrisCornerDetect(Mat &Image, HOG *Hg, Point2d *POS) {
 	float *ImgMag = (float*)malloc(sizeof(float) * inputHeight * inputWidth);
 	float *ImgPhase = (float*)malloc(sizeof(float) * inputHeight * inputWidth);
 
-	GaussianFilter(Img, Img, 5, 1.0); // °¡¿ì½Ã¾È ÇÊÅÍ Àû¿ë (sigma : 1.0, size : 5) 	
+	// ê°€ìš°ì‹œì•ˆ í•„í„° ì ìš© (sigma : 1.0, size : 5)
+	GaussianFilter(Img, Img, 5, 1.0);
 
-	// Ix, Iy°ªÀ» ÀúÀåÇÏ±â À§ÇÑ Æ÷ÀÎÅÍ º¯¼ö
+	// Ix, Iyê°’ì„ ì €ì¥í•˜ê¸° ìœ„í•œ í¬ì¸í„° ë³€ìˆ˜
 	float *Ix = (float*)malloc(sizeof(float) * inputHeight * inputWidth);
 	float *Iy = (float*)malloc(sizeof(float) * inputHeight * inputWidth);
 
-	// SOBEL EDGE FILTER ¿¬»ê
-	int Filter[3] = { -1, 0, 1 }; // SOBEL FILTER
-	int Mag_max = INT_MAX, Mag_min = INT_MIN; // Magnitude Normalize ¸¦ À§ÇØ ÃÖ´ë°ª ÃÖ¼Ò°ª °è»ê
+	// SOBEL EDGE FILTER ì²˜ë¦¬
+	int Filter[3] = { -1, 0, 1 };
+
+	// Magnitude Normalize ë¥¼ ìœ„í•´ ìµœëŒ€ê°’ ìµœì†Œê°’ ê³„ì‚°
+	int Mag_max = INT_MAX, Mag_min = INT_MIN;
 	for (int i = 0; i < inputHeight; i++)
 		for (int j = 0; j < inputWidth; j++) {
 			int fx = 0, fy = 0;
 			for (int x = 0; x < 3; x++) {
-				if (i + x - 1 < 0 || i + x > inputHeight || i + 1 - x < 0 || i + 2 - x > inputHeight) // Boundary ¿¹¿Ü Ã³¸®
+
+				// Boundary ì˜ˆì™¸ ì²˜ë¦¬
+				if (i + x - 1 < 0 || i + x > inputHeight || i + 1 - x < 0 || i + 2 - x > inputHeight)
 					continue;
 				for (int y = 0; y < 3; y++) {
-					if (j + y - 1 < 0 || j + y > inputWidth || j + 1 - y < 0 || j + 2 - y > inputWidth) // Boundary ¿¹¿Ü Ã³¸®
+
+					// Boundary ì˜ˆì™¸ ì²˜ë¦¬
+					if (j + y - 1 < 0 || j + y > inputWidth || j + 1 - y < 0 || j + 2 - y > inputWidth)
 						continue;
-					if (y != 1) fx += Filter[y] * Img.at<uchar>(i + x - 1, j + y - 1); // SOBEL FILTER ¿¬»ê
+
+					// SOBEL FILTER ì—°ì‚°
+					if (y != 1) fx += Filter[y] * Img.at<uchar>(i + x - 1, j + y - 1);
 					if (x != 1) fy += Filter[x] * Img.at<uchar>(i + x - 1, j + y - 1);
 				}
 			}
-			ImgMag[i * inputWidth + j] = VECTOR_ADD(fx, fy); // º¤ÅÍ ÇÕ ¿¬»êÀ» ÀÌ¿ëÇÏ¿©  magnitude °è»ê
-			Mag_max = (Mag_max < ImgMag[i * inputWidth + j]) ? ImgMag[i * inputWidth + j] : Mag_max; // ÃÖ´ë, ÃÖ¼Ò°ª ±¸ÇÏ±â
-			Mag_min = (Mag_min > ImgMag[i * inputWidth + j]) ? ImgMag[i * inputWidth + j] : Mag_min; // (Normalize½Ã »ç¿ë)
 
-			ImgPhase[i * inputWidth + j] = atan2(fy, fx); // arc tangent ÇÔ¼ö¸¦ ÀÌ¿ëÇÏ¿© Phase °è»ê
-			Ix[i * inputWidth + j] = fx; // Ix¿Í Iy¸¦ Æ÷ÀÎÅÍ º¯¼ö¿¡ ÀúÀå
+			// ë²¡í„° í•© ì—°ì‚°ì„ ì´ìš©í•˜ì—¬  Magnitude ê³„ì‚°
+			ImgMag[i * inputWidth + j] = VECTOR_ADD(fx, fy);
+
+			// ìµœëŒ€, ìµœì†Œê°’ êµ¬í•˜ê¸° (Magnitude Normalizeë¥¼ ìœ„í•´)
+			Mag_max = (Mag_max < ImgMag[i * inputWidth + j]) ? ImgMag[i * inputWidth + j] : Mag_max; 
+			Mag_min = (Mag_min > ImgMag[i * inputWidth + j]) ? ImgMag[i * inputWidth + j] : Mag_min;
+
+			// arc tangent í•¨ìˆ˜ë¥¼ ì´ìš©í•˜ì—¬ Phase ê³„ì‚°
+			ImgPhase[i * inputWidth + j] = atan2(fy, fx);
+
+			// Ixì™€ Iyë¥¼ í¬ì¸í„° ë³€ìˆ˜ì— ì €ì¥
+			Ix[i * inputWidth + j] = fx;
 			Iy[i * inputWidth + j] = fy;
 		}
+
 	// Magnitude Normalize
 	for (int i = 0; i < inputHeight; i++)
 		for (int j = 0; j < inputWidth; j++)
 			ImgMag[i * inputWidth + j] = (ImgMag[i * inputWidth + j] - Mag_min) / (Mag_max - Mag_min) * 255;
 
-	// ¸ğµç ÇÈ¼¿¿¡ ´ëÇØ Histogram °è»ê
+	// ëª¨ë“  í”½ì…€ì— ëŒ€í•´ Histogram ê³„ì‚° (Integral Image)
 	for (int i = 0; i < inputHeight; i++)
 		for (int j = 0; j < inputWidth; j++) {
 			HOG prevX, prevY, prevXY, tmp;
@@ -121,24 +145,31 @@ int HarrisCornerDetect(Mat &Image, HOG *Hg, Point2d *POS) {
 
 	free(ImgMag);
 	free(ImgPhase);
-	// R°ªÀ» ÀúÀåÇÏ±â À§ÇÑ Æ÷ÀÎÅÍ º¯¼ö ¼±¾ğ
+
+	// Rê°’ì„ ì €ì¥í•˜ê¸° ìœ„í•œ í¬ì¸í„° ë³€ìˆ˜ ì„ ì–¸
 	double *R = (double*)malloc(sizeof(double) * inputHeight * inputWidth);
-	double max = INT_MAX; // R°ªÀÇ ÃÖ´ë°ªÀ» ±¸ÇÏ±â À§ÇÑ º¯¼ö
+
+	// Rê°’ì˜ ìµœëŒ€ê°’ì„ êµ¬í•˜ê¸° ìœ„í•œ ë³€ìˆ˜
+	double max = INT_MAX;
+
 	for (int i = 0 + (WINDOWSIZE / 2); i < inputHeight - (WINDOWSIZE / 2); i++) {
 		for (int j = 0 + (WINDOWSIZE / 2); j < inputWidth - (WINDOWSIZE / 2); j++) {
 			double IxIx = 0, IyIy = 0, IxIy = 0;
-			// À©µµ¿ì Å©±â¸¸Å­ ¹İº¹¹®À» µ¹¸®¸ç Ix, Iy ¿¬»ê
+			
+			// ìœˆë„ìš° í¬ê¸°ë§Œí¼ ë°˜ë³µë¬¸ì„ ëŒë¦¬ë©° Ix, Iy ì—°ì‚°
 			for (int y = i - (WINDOWSIZE / 2); y < i + (WINDOWSIZE / 2) + 1; y++) {
 				for (int x = j - (WINDOWSIZE / 2); x < j + (WINDOWSIZE / 2) + 1; x++) {
 					IxIx += Ix[y * inputWidth + x] * Ix[y * inputWidth + x];
 					IxIy += Ix[y * inputWidth + x] * Iy[y * inputWidth + x];
 					IyIy += Iy[y * inputWidth + x] * Iy[y * inputWidth + x];
 				}
-			}// det¿Í trace ¿¬»ê
+			}
+			
+			// detì™€ trace ì—°ì‚°
 			double det = IxIx * IyIy - IxIy * IxIy;
 			double trace = IxIx + IyIy;
 
-			// R°ªÀÇ Æ÷ÀÎÅÍ º¯¼ö¿¡ ¿¬»êÇÏ¿© ÀúÀåÇÏ°í ÃÖ´ë°ª ±¸ÇÏ±â
+			// Rê°’ì˜ í¬ì¸í„° ë³€ìˆ˜ì— ì—°ì‚°í•˜ì—¬ ì €ì¥ ë° ìµœëŒ€ê°’ ê³„ì‚°
 			R[i * inputWidth + j] = det - K * (trace * trace);
 			max = (max < R[i * inputWidth + j]) ? R[i * inputWidth + j] : max;
 		}
@@ -146,11 +177,13 @@ int HarrisCornerDetect(Mat &Image, HOG *Hg, Point2d *POS) {
 	free(Ix);
 	free(Iy);
 	int cnt = 0;
-	// ÀÌ¹ÌÁö¸¦ ¹İº¹¹®À¸·Î µ¹¸ç R°ªÀÌ Thresholdº¸´Ù Å¬¶§, ÄÚ³Ê ÁÂÇ¥ Ãß°¡
+
+	// ì´ë¯¸ì§€ë¥¼ ë°˜ë³µë¬¸ìœ¼ë¡œ ëŒë©° Rê°’ì´ Thresholdë³´ë‹¤ í´ ê²½ìš° í•´ë‹¹ Cornerì˜ ì¢Œí‘œ ì¶”ê°€
 	for (int i = 0; i < inputHeight; i++)
 		for (int j = 0; j < inputWidth; j++) {
 			int flag = 1;
-			// °¢ ÁÂÇ¥ÀÇ 1ÇÈ¼¿ Å×µÎ¸®¸¦ Ã¼Å©ÇÏ¸ç ÇØ´ç °ªÀÌ Áß¾ÓÀÇ °ªº¸´Ù ÀÛÀ»¶§¸¸ ÄÚ³Ê·Î ÀÎÁ¤
+
+			// ê° ì¢Œí‘œì˜ 1í”½ì…€ í…Œë‘ë¦¬ë¥¼ ì²´í¬í•˜ë©° í•´ë‹¹ ê°’ì´ ì¤‘ì•™ì˜ ê°’ë³´ë‹¤ ì‘ì„ë•Œë§Œ Cornerë¡œ ì·¨ê¸‰
 			for (int m = i - 1; m <= i + 1 && flag == 1; m++) {
 				if (m < 0 || m >= inputHeight)
 					continue;
@@ -162,23 +195,26 @@ int HarrisCornerDetect(Mat &Image, HOG *Hg, Point2d *POS) {
 					if (R[m * inputWidth + n] >= R[i * inputWidth + j])
 						flag = 0;
 				}
-			}// R°ªÀÌ RÀÇ ÃÖ´ë°ª * Threshold º¸´Ù Å¬ ¶§¸¸ ÄÚ³Ê·Î ÀÎÁ¤
+			}// Rê°’ì´ Rì˜ ìµœëŒ€ê°’ * Threshold ë³´ë‹¤ í´ ë•Œë§Œ Cornerë¡œ ì·¨ê¸‰
 			if (flag == 1 && R[i * inputWidth + j] > max * THRESHOLD) {
 				POS[cnt++] = Point2d(j, i);
 			}
 		}
 	free(R);
-	return cnt; // Ã£Àº ÄÚ³ÊÀÇ °³¼ö¸¦ ¹İÈ¯
+
+	// Cornerì˜ ê°œìˆ˜ë¥¼ ë°˜í™˜
+	return cnt;
 }
 
-void Histogram(Mat &Img, Point2d p, HOG *Hg, int BinIndex, float *Bin) { // Histogram ÇÔ¼ö
+// Histogram ì—°ì‚° í•¨ìˆ˜
+void Histogram(Mat &Img, Point2d p, HOG *Hg, int BinIndex, float *Bin) {
 
 	int inputHeight = Img.rows;
 	int inputWidth = Img.cols;
 
 	for (int k = 0; k < 36; k++) Bin[BinIndex * 36 + k] = 0;
 
-	// ÁÂÇ¥ p¸¦ Áß½ÉÀ¸·Î HISTOGRAMINTV ¸¸Å­ ¿òÁ÷¿©°¡¸ç blkSize Å©±â·Î 4¹ø Histogram ÇÑ´Ù.
+	// ì¢Œí‘œ pë¥¼ ì¤‘ì‹¬ìœ¼ë¡œ HISTOGRAMINTV ë§Œí¼ ì›€ì§ì—¬ê°€ë©° blkSize í¬ê¸°ë¡œ 4ë²ˆ Histogram í•œë‹¤.
 	int blkSize = HISTOGRAMSIZE + HISTOGRAMINTV;
 	for (int t = 0; t < 4; t++) {
 		Point2d start = Point2d(p.x - (blkSize / 2) + (t % 2) * HISTOGRAMINTV, p.y - (blkSize / 2) + (t / 2) * HISTOGRAMINTV), end = Point2d(p.x - (blkSize / 2) + (t % 2) * HISTOGRAMINTV + HISTOGRAMSIZE, p.y - (blkSize / 2) + (t / 2) * HISTOGRAMINTV + HISTOGRAMSIZE);
@@ -201,86 +237,98 @@ void Histogram(Mat &Img, Point2d p, HOG *Hg, int BinIndex, float *Bin) { // Hist
 		for (int k = 0; k < 9; k++) Bin[Index + k] += tmp.d[k];
 	}
 }
+
+// VideoStabilizationì„ ìœ„í•œ í•¨ìˆ˜
 void VideoStabilization(Mat &prevImg, Mat &currentImg, Mat &stabilizationImg, Point2d *prevP, int *prevCont, float *prevBin, int &prevcnt, int &prevMatchCnt, Point2d &stabilization)
 {
-	// Ã³À½ ½ÇÇàÇßÀ»¶§¸¸ ÄÚ³Ê¸¦ Ã£¾Æ Histogram ÇÑ´Ù. (±× ÀÌÈÄºÎÅÍ´Â ÇöÀç ÇÁ·¹ÀÓ °ªÀ» ÀÌÀü ÇÁ·¹ÀÓ¿¡ µ¤¾î¾º¿ì±â)
+	// ì²˜ìŒ ì‹¤í–‰í–ˆì„ë•Œë§Œ Cornerë¥¼ ì°¾ì•„ Histogram í•œë‹¤. (ê·¸ ì´í›„ë¶€í„°ëŠ” í˜„ì¬ í”„ë ˆì„ ê°’ì„ ì´ì „ í”„ë ˆì„ì— ë®ì–´ì”Œìš°ê¸°)
 	if (prevcnt < 0) {
 		HOG *prevHog = (HOG*)malloc(sizeof(HOG) * prevImg.cols * prevImg.rows);
 		prevcnt = HarrisCornerDetect(prevImg, prevHog, prevP);
 		for (int i = 0; i < prevcnt; i++) Histogram(prevImg, prevP[i], prevHog, i, prevBin);
 		free(prevHog);
 	}
-	
 
-	// ÄÚ³ÊµéÀÇ ÁÂÇ¥¸¦ ÀúÀåÇÏ´Â Æ÷ÀÎÅÍ º¯¼ö
+
+	// Cornerë“¤ì˜ ì¢Œí‘œë¥¼ ì €ì¥í•˜ëŠ” í¬ì¸í„° ë³€ìˆ˜
 	Point2d *currentP = (Point2d*)malloc(sizeof(Point2d) * currentImg.cols * currentImg.rows);
 	int *currentCont = (int*)malloc(sizeof(int*) * currentImg.cols * currentImg.rows);
 
-	// °¢ ÀÌ¹ÌÁö¸¶´Ù HarrisCornerDetect ÇÔ¼ö¸¦ Æ÷ÀÎÅÍ¹è¿­ÀÇ ÁÖ¼Ò¸¦ ¸Å°³º¯¼ö·Î È£ÃâÇÏ¿©
-	// ÇÔ¼ö¿¡¼­ Æ÷ÀÎÅÍ º¯¼ö¿¡ °ªÀ» ÇÒ´çÇÏ¸ç, ÇÔ¼ö´Â ÄÚ³ÊÀÇ °³¼ö¸¦ ¹İÈ¯ÇÑ´Ù.
+	// ê° ì´ë¯¸ì§€ë§ˆë‹¤ HarrisCornerDetect í•¨ìˆ˜ë¥¼ í¬ì¸í„°ë°°ì—´ì˜ ì£¼ì†Œë¥¼ ë§¤ê°œë³€ìˆ˜ë¡œ í˜¸ì¶œí•˜ì—¬
+	// í•¨ìˆ˜ì—ì„œ í¬ì¸í„° ë³€ìˆ˜ì— ê°’ì„ í• ë‹¹í•˜ë©°, í•¨ìˆ˜ëŠ” Cornerì˜ ê°œìˆ˜ë¥¼ ë°˜í™˜í•œë‹¤.
 	HOG *currentHog = (HOG*)malloc(sizeof(HOG) * currentImg.cols * currentImg.rows);
 
-	// ÄÚ³ÊÀÇ °³¼ö¸¦ ÀúÀå
+	// Cornerì˜ ê°œìˆ˜ë¥¼ ì €ì¥
 	int currentcnt = HarrisCornerDetect(currentImg, currentHog, currentP);
 
-	// Histogram Bin ¹è¿­ ¼±¾ğ (16*16 ºí¶ôÀ» Áß½ÉÁÂÇ¥ ±âÁØÀ¸·Î 8ÇÈ¼¿¾¿ 4¹ø ÀÌµ¿½ÃÄÑ°¡¸ç Histogram, Corner ÁÂÇ¥ ÇÏ³ª´ç 36°³ ¹è¿­ »ç¿ë)
+	// Histogram Bin ë°°ì—´ ì„ ì–¸ (16*16 ë¸”ë½ì„ ì¤‘ì‹¬ì¢Œí‘œ ê¸°ì¤€ìœ¼ë¡œ 8í”½ì…€ì”© 4ë²ˆ ì´ë™ì‹œì¼œê°€ë©° Histogram, Corner ì¢Œí‘œ í•˜ë‚˜ë‹¹ 36ê°œ ë°°ì—´ ì‚¬ìš©)
 	float *currentBin = (float*)malloc(currentcnt * 36 * sizeof(float));
 
 
-	// °¢°¢ ÀÌ¹ÌÁö¸¶´Ù ÁÂÇ¥ÀÇ °³¼ö¸¸Å­ ¹İº¹¹®À» µ¹¸ç Histogram ÇÔ¼ö ½ÇÇà
+	// ê°ê° ì´ë¯¸ì§€ë§ˆë‹¤ ì¢Œí‘œì˜ ê°œìˆ˜ë§Œí¼ ë°˜ë³µë¬¸ì„ ëŒë©° Histogram í•¨ìˆ˜ ì‹¤í–‰
 	for (int i = 0; i < currentcnt; i++) Histogram(currentImg, currentP[i], currentHog, i, currentBin);
 	free(currentHog);
 
 
-	// HistogramÀÌ °¡Àå À¯»çÇÑ ÁÂÇ¥¸¦ ÀúÀåÇÏ±â À§ÇÑ ¹è¿­
+	// Histogramì´ ê°€ì¥ ìœ ì‚¬í•œ ì¢Œí‘œë¥¼ ì €ì¥í•˜ê¸° ìœ„í•œ ë°°ì—´
 	int *prevBestMatch = (int*)malloc(prevcnt * sizeof(int));
 	int *currentbestMatch = (int*)malloc(currentcnt * sizeof(int));
 
-	// HistogramÀÇ À¯»çµµ¸¦ °è»êÇÒ¶§ À¯»çµµÀÇ °ªÀ» ÀúÀåÇÏ±â À§ÇÑ ¹è¿­ (°ªÀÌ ÀÛÀ»¼ö·Ï À¯»çÇÔ)
+	// Histogramì˜ ìœ ì‚¬ë„ë¥¼ ê³„ì‚°í• ë•Œ ìœ ì‚¬ë„ì˜ ê°’ì„ ì €ì¥í•˜ê¸° ìœ„í•œ ë°°ì—´ (ê°’ì´ ì‘ì„ìˆ˜ë¡ ìœ ì‚¬í•¨)
 	int *prevMin = (int*)malloc(prevcnt * sizeof(int));
 	int *currentMin = (int*)malloc(currentcnt * sizeof(int));
 
-	// À¯»çµµ °ªÀ» ºñ±³ÇÏ±â À§ÇÑ ÃÖ´ë ÃÖ¼Ò º¯¼ö
+	// ìœ ì‚¬ë„ ê°’ì„ ë¹„êµí•˜ê¸° ìœ„í•œ ìµœëŒ€ ìµœì†Œ ë³€ìˆ˜
 	float Rmin = INT_MAX, Rmax = INT_MIN;
 	float Tmin = INT_MAX, Tmax = INT_MIN;
 
-	// prev ÀÌ¹ÌÁö¿¡¼­ Ã£Àº ÄÚ³ÊÀÇ °³¼ö¸¸Å­ ¹İº¹¹®À» ½ÇÇà
+	// prev ì´ë¯¸ì§€ì—ì„œ ì°¾ì€ Cornerì˜ ê°œìˆ˜ë§Œí¼ ë°˜ë³µë¬¸ì„ ì‹¤í–‰
 	for (int i = 0; i < prevcnt; i++) {
-		prevMin[i] = INT_MAX; // ÇØ´ç ÁÂÇ¥ÀÇ Histogram°ú °¡Àå À¯»çÇÑ Histogram ÁÂÇ¥¸¦
-		prevBestMatch[i] = -1; //  Ã£±â À§ÇØ º¯¼ö ÃÊ±âÈ­
-		// current ÀÌ¹ÌÁöÀÇ ÄÚ³Ê °³¼ö¸¸Å­ ¹İº¹¹®À» µ¹¸ç ºñ±³
+		prevMin[i] = INT_MAX;
+		prevBestMatch[i] = -1;
+
+		// current ì´ë¯¸ì§€ì˜ Corner ê°œìˆ˜ë§Œí¼ ë°˜ë³µë¬¸ì„ ëŒë©° ë¹„êµ
 		for (int j = 0; j < currentcnt; j++) {
-			float avg = 0; // °¢ Histogram ´Ü°èº° °ªÀ» À¯Å¬¸®µå °Å¸®¸¦ ÀÌ¿ëÇØ °è»ê
+			// ê° Histogram ë‹¨ê³„ë³„ ê°’ì„ ìœ í´ë¦¬ë“œ ê±°ë¦¬ë¥¼ ì´ìš©í•´ ê³„ì‚°
+			float avg = 0;
 			for (int u = 0; u < 36; u++)
 				avg += (prevBin[i * 36 + u] - currentBin[j * 36 + u]) * (prevBin[i * 36 + u] - currentBin[j * 36 + u]);
-			if (prevMin[i] > avg) { // À¯»çµµ¸¦ °è»êÇÑ °ªÀÌ ÃÖ¼Ò°¡ µÇ´Â ÁÖ¼Ò¸¦ ¹è¿­¿¡ ÀúÀå
+
+			// ìœ ì‚¬ë„ë¥¼ ê³„ì‚°í•œ ê°’ì´ ìµœì†Œê°€ ë˜ëŠ” ì£¼ì†Œë¥¼ ë°°ì—´ì— ì €ì¥
+			if (prevMin[i] > avg) {
 				prevMin[i] = avg;
 				prevBestMatch[i] = j;
 			}
 		}
-		// À¯»çµµÀÇ ÃÖ¼Ò°ª°ú ÃÖ´ë°ªÀ» ±¸ÇÔ
+
+		// ìœ ì‚¬ë„ì˜ ìµœì†Œê°’ê³¼ ìµœëŒ€ê°’ì„ êµ¬í•¨
 		Rmax = (Rmax < prevMin[i]) ? prevMin[i] : Rmax;
 		Rmin = (Rmin > prevMin[i]) ? prevMin[i] : Rmin;
 	}
 	for (int i = 0; i < currentcnt; i++) {
-		currentMin[i] = INT_MAX; // ÇØ´ç ÁÂÇ¥ÀÇ Histogram°ú °¡Àå À¯»çÇÑ Histogram ÁÂÇ¥¸¦
-		currentbestMatch[i] = -1; //  Ã£±â À§ÇØ º¯¼ö ÃÊ±âÈ­
-		// prev ÀÌ¹ÌÁöÀÇ ÄÚ³Ê °³¼ö¸¸Å­ ¹İº¹¹®À» µ¹¸ç ºñ±³
+		currentMin[i] = INT_MAX;
+		currentbestMatch[i] = -1;
+
+		// prev ì´ë¯¸ì§€ì˜ Corner ê°œìˆ˜ë§Œí¼ ë°˜ë³µë¬¸ì„ ëŒë©° ë¹„êµ
 		for (int j = 0; j < prevcnt; j++) {
-			float avg = 0; // °¢ Histogram ´Ü°èº° °ªÀ» À¯Å¬¸®µå °Å¸®¸¦ ÀÌ¿ëÇØ °è»ê
+			// ê° Histogram ë‹¨ê³„ë³„ ê°’ì„ ìœ í´ë¦¬ë“œ ê±°ë¦¬ë¥¼ ì´ìš©í•´ ê³„ì‚°
+			float avg = 0; 
 			for (int u = 0; u < 36; u++)
 				avg += (currentBin[i * 36 + u] - prevBin[j * 36 + u]) * (currentBin[i * 36 + u] - prevBin[j * 36 + u]);
-			if (currentMin[i] > avg) { // À¯»çµµ¸¦ °è»êÇÑ °ªÀÌ ÃÖ¼Ò°¡ µÇ´Â ÁÖ¼Ò¸¦ ¹è¿­¿¡ ÀúÀå
+
+			// ìœ ì‚¬ë„ë¥¼ ê³„ì‚°í•œ ê°’ì´ ìµœì†Œê°€ ë˜ëŠ” ì£¼ì†Œë¥¼ ë°°ì—´ì— ì €ì¥
+			if (currentMin[i] > avg) {
 				currentMin[i] = avg;
 				currentbestMatch[i] = j;
 			}
 		}
-		// À¯»çµµÀÇ ÃÖ¼Ò°ª°ú ÃÖ´ë°ªÀ» ±¸ÇÔ
+
+		// ìœ ì‚¬ë„ì˜ ìµœì†Œê°’ê³¼ ìµœëŒ€ê°’ì„ êµ¬í•¨
 		Tmax = (Tmax < currentMin[i]) ? currentMin[i] : Tmax;
 		Tmin = (Tmin > currentMin[i]) ? currentMin[i] : Tmin;
 	}
 
-	// À¯»çµµÀÇ ¿ÀÂ÷ °ªÀÌ ³Ê¹« ³ôÀº °æ¿ì ÄÚ³Ê·Î Ãë±ŞÇÏÁö ¾ÊÀ½
+	// ìœ ì‚¬ë„ì˜ ì˜¤ì°¨ ê°’ì´ ì¼ì • ìˆ˜ì¹˜ ì´ìƒì¸ ê²½ìš° Cornerë¡œ ì·¨ê¸‰í•˜ì§€ ì•ŠìŒ (ì„ì˜ë¡œ ì§€ì •)
 	for (int i = 0; i < prevcnt; i++)
 		if (prevMin[i] > (Rmax + Rmin) * 0.7)
 			prevBestMatch[i] = -1;
@@ -305,7 +353,7 @@ void VideoStabilization(Mat &prevImg, Mat &currentImg, Mat &stabilizationImg, Po
 
 	Point2d moveP = Point2d(0, 0);
 	int cnt = 0;
-	
+
 	int *bestmoveX = (int*)malloc(sizeof(int) * currentImg.cols * currentImg.rows);
 	int *bestmoveY = (int*)malloc(sizeof(int) * currentImg.cols * currentImg.rows);
 	int *bestmoveXCnt = (int*)calloc(currentImg.cols * currentImg.rows, sizeof(int));
@@ -315,10 +363,11 @@ void VideoStabilization(Mat &prevImg, Mat &currentImg, Mat &stabilizationImg, Po
 
 	int currentMatchCnt = 0;
 
-	// currentÀÇ ÁÂÇ¥¿Í prev ÁÂÇ¥ÀÇ °¡Àå À¯»çÇÑ ÁÂÇ¥°¡ ¼­·Î ÀÏÄ¡ÇÒ °æ¿ì¿¡ Line Drawing
+	// currentì˜ ì¢Œí‘œì™€ prev ì¢Œí‘œì˜ ê°€ì¥ ìœ ì‚¬í•œ ì¢Œí‘œê°€ ì„œë¡œ ì¼ì¹˜í•  ê²½ìš°ì— Line Drawing
 	for (int i = 0; i < currentcnt; i++) {
 		if (currentbestMatch[i] != -1 && prevBestMatch[currentbestMatch[i]] == i) {
-			// ÇØ´ç Æ÷ÀÎÆ®°¡ ¿¬¼ÓÀ¸·Î ¿©·¯¹ø ¿¬°á µÉ °æ¿ì ÃÊ·Ï»öÀ¸·Î Ç¥½Ã
+
+			// í•´ë‹¹ í¬ì¸íŠ¸ê°€ ì—°ì†ìœ¼ë¡œ ì—¬ëŸ¬ë²ˆ ì—°ê²° ë  ê²½ìš° ì´ˆë¡ìƒ‰ìœ¼ë¡œ í‘œì‹œ
 			currentCont[i] = (prevCont[currentbestMatch[i]] < 10) ? (prevCont[currentbestMatch[i]] + 1) : 10;
 			if (currentCont[i] > 2) currentMatchCnt++;
 
@@ -356,11 +405,10 @@ void VideoStabilization(Mat &prevImg, Mat &currentImg, Mat &stabilizationImg, Po
 	free(bestmoveXCnt);
 	free(bestmoveYCnt);
 
-	
+
 	stabilization += moveP;
 	
-	//È­¸éÀÌ ¿òÁ÷ÀÏ¶§
-	
+	//í™”ë©´ì´ ì›€ì§ì¼ë•Œ
 	if (prevMatchCnt * 0.5 > currentMatchCnt) {
 		stabilization.x = (STABILIZATION_MARGIN + stabilization.x) / 2;
 		stabilization.y = (STABILIZATION_MARGIN + stabilization.y) / 2;
@@ -372,7 +420,7 @@ void VideoStabilization(Mat &prevImg, Mat &currentImg, Mat &stabilizationImg, Po
 	if (stabilization.y > 2 * STABILIZATION_MARGIN)stabilization.y = 2 * STABILIZATION_MARGIN;
 	if (stabilization.x < 0)stabilization.x = 0;
 	if (stabilization.y < 0)stabilization.y = 0;
-	
+
 
 	currentImg(Rect(stabilization, Size(currentImg.cols - 2 * STABILIZATION_MARGIN, currentImg.rows - 2 * STABILIZATION_MARGIN))).copyTo(stabilizationImg);
 	stabilizationImg.copyTo(resultImg(Rect(stabilization + Point2d(currentImg.cols, 0), Size(stabilizationImg.cols, stabilizationImg.rows))));
@@ -383,7 +431,7 @@ void VideoStabilization(Mat &prevImg, Mat &currentImg, Mat &stabilizationImg, Po
 	rectangle(resultImg, stabilization + Point2d(currentImg.cols, 0), stabilization + Point2d(currentImg.cols, 0) + Point2d(stabilizationImg.cols, stabilizationImg.rows), Scalar(0, 255, 0), 2, 8, 0);
 
 
-	// ÇöÀç ÇÁ·¹ÀÓÀÇ °ªÀ» ÀÌÀü ÇÁ·¹ÀÓ ¹è¿­¿¡ º¹»ç
+	// í˜„ì¬ í”„ë ˆì„ì˜ ê°’ì„ ì´ì „ í”„ë ˆì„ ë°°ì—´ì— ë³µì‚¬
 	prevcnt = currentcnt;
 	prevMatchCnt = currentMatchCnt;
 	for (int i = 0; i < prevcnt; i++) {
@@ -402,9 +450,9 @@ void VideoStabilization(Mat &prevImg, Mat &currentImg, Mat &stabilizationImg, Po
 	stabilizationImg = resultImg;
 }
 int main(int argc, const char* argv[]){
-	
+
 	String FilePath;
-	
+
 	if (argc > 1)
 		FilePath = argv[1];
 
@@ -434,6 +482,7 @@ int main(int argc, const char* argv[]){
 
 		frame.copyTo(prevframe);
 		int key = waitKey(1);
+
 		// ESC to break
 		if (key == 27) break;
 	}
