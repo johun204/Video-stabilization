@@ -10,3 +10,8 @@ Video stabilization using Harris Corner Detection.
 
 ## Result
 <img src='https://github.com/johun204/Video-stabilization/raw/main/media/image2.gif' height='500px'>
+
+## Requirements
+
+* OpenCV
+* C++
