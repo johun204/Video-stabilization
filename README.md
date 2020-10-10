@@ -13,5 +13,5 @@ Video stabilization using Harris Corner Detection.
 
 ## Requirements
 
-* OpenCV
+* OpenCV >= 3.4
 * C++
