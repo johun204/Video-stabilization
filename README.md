@@ -4,7 +4,7 @@ Video stabilization using Harris Corner Detection.
 ## Overview
 <img src='https://github.com/johun204/Video-stabilization/raw/main/media/image1.gif' height='300px'>
 
- * Use Harris Corner Detection to calculate the similarity between the previous frame and the current frame, then move the Stabilization Rectangle according to the position change.
+ * The Stabilization Rectangle was shifted according to the position change detected using the Histogram of Gradient to calculate the similarity between the previous frame and the current frame corner detected by Harris Corner Detection.
 
  * Increased computation speed with Integrated Image.
 
